@@ -1,7 +1,7 @@
 package collections
 
 import (
-	. "github.com/jrivets/go-common/Godeps/_workspace/src/gopkg.in/check.v1"
+	. "gopkg.in/check.v1"
 	"testing"
 )
 
