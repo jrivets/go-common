@@ -38,6 +38,13 @@ func EndQuietly() {
 	recover()
 }
 
+// Calls panic with the error description if the err is not nil
+func AssertNoError(err error) {
+	if err != nil {
+		panic(err.Error())
+	}
+}
+
 // Parses boolean value removing leading or trailing spaces if present
 func ParseBool(value string, defaultValue bool) (bool, error) {
 	value = strings.ToLower(strings.Trim(value, " "))

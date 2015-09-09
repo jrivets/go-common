@@ -1,6 +1,7 @@
 package gorivets
 
 import (
+	"errors"
 	. "github.com/jrivets/gorivets/Godeps/_workspace/src/gopkg.in/check.v1"
 )
 
@@ -89,4 +90,17 @@ func (s *utilsSuite) TestParseBool(c *C) {
 	v, err = ParseBool("", true)
 	c.Assert(err, IsNil)
 	c.Assert(v, Equals, true)
+}
+
+func (s *utilsSuite) TestAssertNotNull(c *C) {
+	c.Assert(checkPanic(func() { AssertNoError(nil) }), Equals, false)
+	c.Assert(checkPanic(func() { AssertNoError(errors.New("ddd")) }), Equals, true)
+}
+
+func checkPanic(f func()) (result bool) {
+	defer func() {
+		result = recover() != nil
+	}()
+	f()
+	return
 }
