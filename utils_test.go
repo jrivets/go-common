@@ -93,14 +93,6 @@ func (s *utilsSuite) TestParseBool(c *C) {
 }
 
 func (s *utilsSuite) TestAssertNotNull(c *C) {
-	c.Assert(checkPanic(func() { AssertNoError(nil) }), Equals, false)
-	c.Assert(checkPanic(func() { AssertNoError(errors.New("ddd")) }), Equals, true)
-}
-
-func checkPanic(f func()) (result bool) {
-	defer func() {
-		result = recover() != nil
-	}()
-	f()
-	return
+	c.Assert(CheckPanic(func() { AssertNoError(nil) }), Equals, false)
+	c.Assert(CheckPanic(func() { AssertNoError(errors.New("ddd")) }), Equals, true)
 }

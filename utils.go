@@ -45,6 +45,15 @@ func AssertNoError(err error) {
 	}
 }
 
+// Invokes the function and returns whether it panics or not
+func CheckPanic(f func()) (result bool) {
+	defer func() {
+		result = recover() != nil
+	}()
+	f()
+	return
+}
+
 // Parses boolean value removing leading or trailing spaces if present
 func ParseBool(value string, defaultValue bool) (bool, error) {
 	value = strings.ToLower(strings.Trim(value, " "))
