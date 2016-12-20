@@ -29,6 +29,17 @@ func Min(a, b int) int {
 	return a
 }
 
+func CompareInt(a int, b int) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	default:
+		return 0
+	}
+}
+
 // Calls recover() to consume panic if it happened, it is recomended to be used with defer:
 //
 // 	func TestNoPanic() {

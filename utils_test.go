@@ -2,6 +2,7 @@ package gorivets
 
 import (
 	"errors"
+
 	"gopkg.in/check.v1"
 )
 
@@ -20,6 +21,15 @@ func (s *utilsSuite) TestMin(c *check.C) {
 	c.Assert(Min(1, 0), check.Equals, 0)
 	c.Assert(Min(2, 2), check.Equals, 2)
 	c.Assert(Min(10, 100), check.Equals, 10)
+}
+
+func (s *utilsSuite) TesCompareInt(c *check.C) {
+	c.Assert(CompareInt(10, 30), check.Equals, -1)
+	c.Assert(CompareInt(-10, 5), check.Equals, -1)
+	c.Assert(CompareInt(10, 10), check.Equals, 0)
+	c.Assert(CompareInt(-5, -5), check.Equals, 0)
+	c.Assert(CompareInt(10, 5), check.Equals, 1)
+	c.Assert(CompareInt(-10, -50), check.Equals, 1)
 }
 
 func (s *utilsSuite) TestParseInt64(c *check.C) {
