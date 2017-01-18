@@ -54,10 +54,13 @@ func (s *gMapSuite) TestGetPut(c *check.C) {
 
 	v, ok := GMapGet("key")
 	c.Assert(ok, check.Equals, false)
-	c.Assert(GMapPut("key", 123), check.Equals, false)
+	_, ok = GMapPut("key", 123)
+	c.Assert(ok, check.Equals, false)
 	v, _ = GMapGet("key")
 	c.Assert(v, check.Equals, 123)
-	c.Assert(GMapPut("key", 345), check.Equals, true)
+	v, ok = GMapPut("key", 345)
+	c.Assert(v, check.Equals, 123)
+	c.Assert(ok, check.Equals, true)
 	v, _ = GMapGet("key")
 	c.Assert(v, check.Equals, 345)
 }
@@ -66,9 +69,13 @@ func (s *gMapSuite) TestDelete(c *check.C) {
 	defer GMapShutdown()
 	c.Assert(gmap.file, check.IsNil)
 
-	c.Assert(GMapPut("key", 123), check.Equals, false)
+	_, ok := GMapPut("key", 123)
+	c.Assert(ok, check.Equals, false)
 	v, _ := GMapGet("key")
 	c.Assert(v, check.Equals, 123)
+	c.Assert(gmap.file, check.NotNil)
 	c.Assert(GMapDelete("key"), check.Equals, 123)
+	c.Assert(gmap.file, check.IsNil)
 	c.Assert(GMapDelete("key"), check.IsNil)
+	c.Assert(gmap.file, check.IsNil)
 }

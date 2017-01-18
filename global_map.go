@@ -8,6 +8,7 @@ import (
 	"sync"
 )
 
+// TODO: describe behaviour
 var gmap struct {
 	gm   map[string]interface{}
 	file *os.File
@@ -23,14 +24,14 @@ func GMapGet(key string) (interface{}, bool) {
 	return v, ok
 }
 
-func GMapPut(key string, value interface{}) bool {
+func GMapPut(key string, value interface{}) (interface{}, bool) {
 	gmap.lock.Lock()
 	defer gmap.lock.Unlock()
 
 	checkGMap()
-	_, ok := gmap.gm[key]
+	v, ok := gmap.gm[key]
 	gmap.gm[key] = value
-	return ok
+	return v, ok
 }
 
 func GMapDelete(key string) interface{} {
@@ -40,6 +41,11 @@ func GMapDelete(key string) interface{} {
 	checkGMap()
 	v := gmap.gm[key]
 	delete(gmap.gm, key)
+
+	if len(gmap.gm) == 0 {
+		deleteGMap()
+	}
+
 	return v
 }
 
@@ -47,11 +53,16 @@ func GMapShutdown() {
 	gmap.lock.Lock()
 	defer gmap.lock.Unlock()
 
+	deleteGMap()
+}
+
+func deleteGMap() {
 	if gmap.file != nil {
 		fn := gmap.file.Name()
 		gmap.file.Close()
 		os.Remove(fn)
 		gmap.file = nil
+		gmap.gm = nil
 	}
 }
 
