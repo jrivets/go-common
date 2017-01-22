@@ -16,6 +16,9 @@ func (s *gMapSuite) TestCreateFile(c *check.C) {
 	c.Assert(gmap.file, check.IsNil)
 
 	GMapGet("key")
+	c.Assert(gmap.file, check.IsNil)
+
+	GMapPut("key", 1234)
 	c.Assert(gmap.file, check.NotNil)
 	fn := gmap.file.Name()
 	fmt.Printf("fileName=%s", fn)
@@ -24,7 +27,7 @@ func (s *gMapSuite) TestCreateFile(c *check.C) {
 		c.Fatalf("Expecting the file %s exists, but it does not.", fn)
 	}
 
-	GMapShutdown()
+	GMapCleanup()
 	_, err = os.Stat(fn)
 	if os.IsExist(err) {
 		c.Fatalf("Expecting the file %s does not exist, but it does", fn)
@@ -33,7 +36,7 @@ func (s *gMapSuite) TestCreateFile(c *check.C) {
 }
 
 func (s *gMapSuite) TestPanic(c *check.C) {
-	defer GMapShutdown()
+	defer GMapCleanup()
 	c.Assert(gmap.file, check.IsNil)
 
 	createGMapFile()
@@ -49,7 +52,7 @@ func (s *gMapSuite) TestPanic(c *check.C) {
 }
 
 func (s *gMapSuite) TestGetPut(c *check.C) {
-	defer GMapShutdown()
+	defer GMapCleanup()
 	c.Assert(gmap.file, check.IsNil)
 
 	v, ok := GMapGet("key")
@@ -66,7 +69,7 @@ func (s *gMapSuite) TestGetPut(c *check.C) {
 }
 
 func (s *gMapSuite) TestDelete(c *check.C) {
-	defer GMapShutdown()
+	defer GMapCleanup()
 	c.Assert(gmap.file, check.IsNil)
 
 	_, ok := GMapPut("key", 123)
