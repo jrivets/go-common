@@ -1,19 +1,16 @@
 package dlock
 
 import (
-	"bytes"
-	"encoding/json"
-	"reflect"
-	"strings"
 	"sync"
 	"time"
+
+	"github.com/mohae/deepcopy"
 )
 
 type ms_record struct {
 	key        string
-	value      string
+	value      interface{}
 	version    int
-	elemType   reflect.Type
 	changeTime time.Time
 	ttl        time.Duration
 	waitChs    []chan bool
@@ -27,12 +24,21 @@ type mem_storage struct {
 	sweepCh   chan bool
 }
 
+var cMaxTime = time.Unix(1<<59-1, 0)
+
 func NewMemStorage() Storage {
-	ms := &mem_storage{sweepCh: make(chan bool, 1)}
+	ms := &mem_storage{data: make(map[string]*ms_record), sweepCh: make(chan bool, 1)}
 
 	go func() {
 		for !ms.closed {
-			sleepTimeout := time.Minute
+			sleepTimeout := ms.sweep()
+			if sleepTimeout < 1 {
+				sleepTimeout = 1
+			}
+			if sleepTimeout > time.Minute {
+				sleepTimeout = time.Minute
+			}
+
 			select {
 			case _, ok := <-ms.sweepCh:
 				if !ok {
@@ -40,31 +46,34 @@ func NewMemStorage() Storage {
 				}
 			case <-time.After(sleepTimeout):
 			}
-			ms.sweep()
 		}
 	}()
 
 	return ms
 }
 
-func (ms *mem_storage) sweep() {
-	maxTime := time.Unix(1<<63-1, 0)
+func (ms *mem_storage) sweep() time.Duration {
 	now := time.Now()
 
-	// if ms.sweepTime == maxTime OR it is before now, we will walk through
+	// if ms.sweepTime == cMaxTime OR it is before now, we will walk through
 	// the list, otherwise go out of here...
-	if maxTime.After(ms.sweepTime) && now.Before(ms.sweepTime) {
-		return
+	if cMaxTime.After(ms.sweepTime) && now.Before(ms.sweepTime) {
+		return ms.sweepTime.Sub(now)
 	}
 
 	ms.lock.Lock()
 	defer ms.lock.Unlock()
 
-	minTime := maxTime
+	if ms.closed {
+		return 0
+	}
+
+	minTime := cMaxTime
 	for k, msr := range ms.data {
 		if msr.ttl == 0 {
 			continue
 		}
+
 		expTime := msr.changeTime.Add(msr.ttl)
 
 		if expTime.Before(now) {
@@ -78,11 +87,16 @@ func (ms *mem_storage) sweep() {
 	}
 
 	ms.sweepTime = minTime
+	return ms.sweepTime.Sub(now)
 }
 
 func (ms *mem_storage) Create(record *Record) (*Record, error) {
 	ms.lock.Lock()
 	defer ms.lock.Unlock()
+
+	if ms.closed {
+		return nil, Error(DLErrClosed)
+	}
 
 	r, ok := ms.data[record.Key]
 	if ok {
@@ -91,14 +105,32 @@ func (ms *mem_storage) Create(record *Record) (*Record, error) {
 
 	r = to_ms_record(record)
 	r.version = 1
-	ms.data[record.Key] = r
-
+	ms.saveRecord(r)
 	return toRecord(r), nil
+}
+
+func (ms *mem_storage) saveRecord(msr *ms_record) {
+	ms.data[msr.key] = msr
+
+	expTime := msr.getExpTime()
+	if ms.sweepTime.After(expTime) || ms.sweepTime.IsZero() {
+		ms.sweepTime = expTime
+
+		// Signal if not full yet...
+		select {
+		case ms.sweepCh <- true:
+		default:
+		}
+	}
 }
 
 func (ms *mem_storage) Get(key string) (*Record, error) {
 	ms.lock.Lock()
 	defer ms.lock.Unlock()
+
+	if ms.closed {
+		return nil, Error(DLErrClosed)
+	}
 
 	r, ok := ms.data[key]
 	if !ok {
@@ -112,6 +144,10 @@ func (ms *mem_storage) CasByVersion(record *Record) (*Record, error) {
 	ms.lock.Lock()
 	defer ms.lock.Unlock()
 
+	if ms.closed {
+		return nil, Error(DLErrClosed)
+	}
+
 	r, ok := ms.data[record.Key]
 	if !ok {
 		return nil, Error(DLErrNotFound)
@@ -123,7 +159,7 @@ func (ms *mem_storage) CasByVersion(record *Record) (*Record, error) {
 
 	r1 := to_ms_record(record)
 	r1.version = r.version + 1
-	ms.data[record.Key] = r1
+	ms.saveRecord(r1)
 	r.notifyChans()
 	return toRecord(r1), nil
 }
@@ -131,6 +167,10 @@ func (ms *mem_storage) CasByVersion(record *Record) (*Record, error) {
 func (ms *mem_storage) Delete(record *Record) (*Record, error) {
 	ms.lock.Lock()
 	defer ms.lock.Unlock()
+
+	if ms.closed {
+		return nil, Error(DLErrClosed)
+	}
 
 	r, ok := ms.data[record.Key]
 	if !ok {
@@ -142,6 +182,7 @@ func (ms *mem_storage) Delete(record *Record) (*Record, error) {
 	}
 
 	delete(ms.data, record.Key)
+
 	r.notifyChans()
 	return nil, nil
 }
@@ -153,11 +194,14 @@ func (ms *mem_storage) WaitVersionChange(key string, version int, timeout time.D
 		return r, err
 	}
 
+	// will do this after ms.dropChan() (see below), what guarantees no write after the call
+	defer close(ch)
+
 	select {
 	case <-ch:
 	case <-time.After(timeout):
-		ms.dropChan(key, ch)
 	}
+	ms.dropChan(key, ch)
 	return ms.Get(key)
 }
 
@@ -165,10 +209,18 @@ func (ms *mem_storage) Close() {
 	ms.lock.Lock()
 	defer ms.lock.Unlock()
 
+	if ms.closed {
+		return
+	}
+
 	for _, msr := range ms.data {
 		msr.notifyChans()
 	}
 
+	ms.data = make(map[string]*ms_record)
+	ms.sweepTime = cMaxTime
+
+	close(ms.sweepCh)
 	ms.closed = true
 }
 
@@ -189,7 +241,7 @@ func (ms *mem_storage) newChan(key string, version int) (chan bool, error) {
 		return nil, Error(DLErrWrongVersion)
 	}
 
-	ch := make(chan bool)
+	ch := make(chan bool, 1)
 	r.waitChs = append(r.waitChs, ch)
 	return ch, nil
 }
@@ -216,14 +268,19 @@ func (ms *mem_storage) dropChan(key string, ch chan bool) {
 func (msr *ms_record) notifyChans() {
 	for _, ch := range msr.waitChs {
 		ch <- true
-		close(ch)
 	}
 	msr.waitChs = make([]chan bool, 0)
 }
 
+func (msr *ms_record) getExpTime() time.Time {
+	if msr.ttl == 0 {
+		return time.Unix(1<<60-1, 0)
+	}
+	return msr.changeTime.Add(msr.ttl)
+}
+
 func toRecord(r *ms_record) *Record {
-	val := reflect.New(r.elemType)
-	json.NewDecoder(strings.NewReader(r.value)).Decode(&val)
+	val := deepcopy.Copy(r.value)
 	ttl := r.ttl - time.Now().Sub(r.changeTime)
 	if r.ttl == 0 {
 		ttl = 0
@@ -236,13 +293,11 @@ func toRecord(r *ms_record) *Record {
 }
 
 func to_ms_record(r *Record) *ms_record {
-	et := reflect.ValueOf(r.Value).Elem().Type()
-	buf := new(bytes.Buffer)
-	json.NewEncoder(buf).Encode(r.Value)
+	val := deepcopy.Copy(r.Value)
 	var ttl time.Duration = 0
 	if r.Ttl > 0 {
 		ttl = r.Ttl
 	}
-	return &ms_record{r.Key, buf.String(), r.Version, et, time.Now(),
+	return &ms_record{r.Key, val, r.Version, time.Now(),
 		ttl, make([]chan bool, 0)}
 }
