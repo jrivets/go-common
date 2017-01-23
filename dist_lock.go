@@ -55,6 +55,12 @@ type (
 	}
 
 	Error int
+
+	DLockManager interface {
+		Start()
+		GetLocker(name string) sync.Locker
+		Shutdown()
+	}
 )
 
 const (
@@ -99,33 +105,7 @@ func (e Error) Error() string {
 	return ""
 }
 
-func NewLock(name string) sync.Locker {
-	if strings.HasPrefix(name, cKeyLockerId) {
-		panic("Wrong name. Prefix=" + cKeyLockerId + " is reserved")
-	}
-	return &dlock{name: name}
-}
-
-func SetStorage(storage Storage) {
-	dlmLock.Lock()
-	defer dlmLock.Unlock()
-
-	if dlm != nil {
-		panic(errors.New("Wrong initialization cycle: dlm already initialized"))
-	}
-
-	dlm = new_dlock_manager(storage, cKeepAliveSec*time.Second)
-	dlm.start()
-}
-
-func Shutdown() {
-	dlmLock.Lock()
-	defer dlmLock.Unlock()
-
-	dlm.stop()
-}
-
-func new_dlock_manager(storage Storage, keepAlive time.Duration) *dlock_manager {
+func NewDLockManager(storage Storage, keepAlive time.Duration) DLockManager {
 	dlm := &dlock_manager{storage: storage, state: ST_STARTING}
 	dlm.cfgKeepAlive = keepAlive
 	dlm.lockerId = uuid.NewV4().String()
@@ -136,6 +116,7 @@ func new_dlock_manager(storage Storage, keepAlive time.Duration) *dlock_manager 
 // ================================ Details ===================================
 type dlock struct {
 	name   string
+	dlm    *dlock_manager
 	lock   sync.Mutex
 	locked bool
 }
@@ -148,7 +129,7 @@ func (dl *dlock) Lock() {
 		panic("Incorrect distributed lock usage: already locked.")
 	}
 
-	dlm.lockGlobal(dl.name)
+	dl.dlm.lockGlobal(dl.name)
 	dl.locked = true
 }
 
@@ -160,7 +141,7 @@ func (dl *dlock) Unlock() {
 		panic("Incorrect distributed lock usage: An attempt to unlock not-locked lock")
 	}
 
-	dlm.unlockGlobal(dl.name)
+	dl.dlm.unlockGlobal(dl.name)
 	dl.locked = false
 }
 
@@ -190,10 +171,7 @@ type lock_info struct {
 	Owner string
 }
 
-var dlm *dlock_manager
-var dlmLock sync.Mutex
-
-func (dlm *dlock_manager) start() {
+func (dlm *dlock_manager) Start() {
 	dlm.lock.Lock()
 	defer dlm.lock.Unlock()
 
@@ -203,8 +181,8 @@ func (dlm *dlock_manager) start() {
 
 	dlm.stopChan = make(chan bool, 1)
 	dlm.state = ST_STARTED
+	dlm.keepAlive()
 	go func() {
-		dlm.keepAlive()
 		for {
 			select {
 			case <-dlm.stopChan:
@@ -216,7 +194,22 @@ func (dlm *dlock_manager) start() {
 	}()
 }
 
-func (dlm *dlock_manager) stop() {
+func (dlm *dlock_manager) GetLocker(name string) sync.Locker {
+	if strings.HasPrefix(name, cKeyLockerId) {
+		panic("Wrong name. Prefix=" + cKeyLockerId + " is reserved")
+	}
+
+	dlm.lock.Lock()
+	defer dlm.lock.Unlock()
+
+	if dlm.state != ST_STARTED {
+		panic(errors.New("Wrong dlock_manager state=" + strconv.Itoa(dlm.state)))
+	}
+
+	return &dlock{name: name, dlm: dlm}
+}
+
+func (dlm *dlock_manager) Shutdown() {
 	dlm.lock.Lock()
 	defer dlm.lock.Unlock()
 
@@ -273,23 +266,26 @@ func (dlm *dlock_manager) lockGlobal(name string) {
 		panic("Could not lock distributed lock \"" + name + "\"locally")
 	}
 
-	li := &lock_info{dlm.lockerId}
-	r, err := dlm.storage.Create(&Record{name, li, 0, 0})
-
-	if err == nil {
-		return
-	}
-
-	if !CheckError(err, DLErrAlreadyExists) {
-		dlm.unlockLocal(name)
-		panic(err)
-	}
-
 	for {
+		li := &lock_info{dlm.lockerId}
+		r, err := dlm.storage.Create(&Record{name, li, 0, 0})
+
+		if err == nil {
+			return
+		}
+
+		if !CheckError(err, DLErrAlreadyExists) {
+			dlm.unlockLocal(name)
+			panic(err)
+		}
+
 		li = r.Value.(*lock_info)
 		if dlm.isLockerIdValid(li.Owner) {
 			r, err = dlm.storage.WaitVersionChange(name, r.Version, dlm.cfgKeepAlive)
-			if CheckError(err, DLErrClosed) {
+			if CheckError(err, DLErrNotFound) {
+				continue
+			}
+			if err != nil {
 				dlm.unlockLocal(name)
 				panic(err)
 			}
@@ -372,7 +368,7 @@ func (dlm *dlock_manager) isLockerIdValid(lockerId string) bool {
 		return true
 	}
 
-	_, err := dlm.storage.Get(lockerId)
+	_, err := dlm.storage.Get(cKeyLockerId + lockerId)
 	if CheckError(err, DLErrNotFound) {
 		return false
 	}
