@@ -13,14 +13,23 @@ type Logger interface {
 	Info(args ...interface{})
 	Debug(args ...interface{})
 	Trace(args ...interface{})
+
+	WithId(id interface{}) Logger
+	WithName(name string) Logger
 }
 
-func NewNilLogger() Logger {
-	return nil_logger{}
+type NewLoggerF func(name string) Logger
+
+func NewNilLoggerProvider() NewLoggerF {
+	return func(name string) Logger {
+		return nil_logger{}
+	}
 }
 
-func NewStubLogger(name string) Logger {
-	return &log{name: name, enabled: true}
+func NewStubLoggerProvider() NewLoggerF {
+	return func(name string) Logger {
+		return &log{name: name, enabled: true}
+	}
 }
 
 type nil_logger struct {
@@ -29,6 +38,7 @@ type nil_logger struct {
 type log struct {
 	name    string
 	enabled bool
+	id      interface{}
 	mx      sync.Mutex
 }
 
@@ -54,6 +64,17 @@ func (log *log) Debug(args ...interface{}) {
 
 func (log *log) Trace(args ...interface{}) {
 	log.log("TRACE", args...)
+}
+
+func (lg *log) WithId(id interface{}) Logger {
+	return &log{name: lg.name, enabled: lg.enabled, id: id}
+}
+
+func (lg *log) WithName(name string) Logger {
+	if lg.name == name {
+		return lg
+	}
+	return &log{name: name, enabled: true, id: lg.id}
 }
 
 func (log *log) log(level string, args ...interface{}) {
@@ -84,4 +105,12 @@ func (log nil_logger) Debug(args ...interface{}) {
 }
 
 func (log nil_logger) Trace(args ...interface{}) {
+}
+
+func (log nil_logger) WithId(id interface{}) Logger {
+	return log
+}
+
+func (log nil_logger) WithName(name string) Logger {
+	return log
 }
