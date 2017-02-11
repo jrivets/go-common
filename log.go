@@ -14,8 +14,8 @@ type Logger interface {
 	Debug(args ...interface{})
 	Trace(args ...interface{})
 
-	WithId(id interface{}) Logger
-	WithName(name string) Logger
+	WithId(id interface{}) interface{}
+	WithName(name string) interface{}
 }
 
 type NewLoggerF func(name string) Logger
@@ -66,11 +66,11 @@ func (log *log) Trace(args ...interface{}) {
 	log.log("TRACE", args...)
 }
 
-func (lg *log) WithId(id interface{}) Logger {
+func (lg *log) WithId(id interface{}) interface{} {
 	return &log{name: lg.name, enabled: lg.enabled, id: id}
 }
 
-func (lg *log) WithName(name string) Logger {
+func (lg *log) WithName(name string) interface{} {
 	if lg.name == name {
 		return lg
 	}
@@ -107,10 +107,10 @@ func (log nil_logger) Debug(args ...interface{}) {
 func (log nil_logger) Trace(args ...interface{}) {
 }
 
-func (log nil_logger) WithId(id interface{}) Logger {
+func (log nil_logger) WithId(id interface{}) interface{} {
 	return log
 }
 
-func (log nil_logger) WithName(name string) Logger {
+func (log nil_logger) WithName(name string) interface{} {
 	return log
 }
