@@ -29,6 +29,16 @@ func Min(a, b int) int {
 	return a
 }
 
+// Returns a maximal value of two integers provided
+func Max(a, b int) int {
+	if a > b {
+		return a
+	} else if b > a {
+		return b
+	}
+	return a
+}
+
 func CompareInt(a int, b int) int {
 	switch {
 	case a < b:
