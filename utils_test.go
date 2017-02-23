@@ -63,6 +63,20 @@ func (s *utilsSuite) TestParseInt64(c *check.C) {
 	c.Assert(int(v), check.Equals, 1024*1024)
 }
 
+func (s *utilsSuite) TestFormatInt64(c *check.C) {
+	c.Assert(FormatInt64(0, 0), check.Equals, "0")
+	c.Assert(FormatInt64(0, 1000), check.Equals, "0")
+	c.Assert(FormatInt64(1, 1000), check.Equals, "1")
+	c.Assert(FormatInt64(-11, 1000), check.Equals, "-11")
+	c.Assert(FormatInt64(-1341234, 100), check.Equals, "-1341234")
+	c.Assert(FormatInt64(-134234, 1000), check.Equals, "-134kb")
+	c.Assert(FormatInt64(134999, 1000), check.Equals, "135kb")
+	c.Assert(FormatInt64(134500, 1000), check.Equals, "135kb")
+	c.Assert(FormatInt64(134500123948712394, 1024), check.Equals, "119pib")
+	c.Assert(FormatInt64(134499123948712394, 1000), check.Equals, "134pb")
+	c.Assert(FormatInt64(1344991232948712394, 1000), check.Equals, "1345pb")
+}
+
 func (s *utilsSuite) TestParseInt(c *check.C) {
 	_, err := ParseInt("123", 1, 220, 0)
 	c.Assert(err, check.NotNil)

@@ -39,6 +39,13 @@ func Max(a, b int) int {
 	return a
 }
 
+func AbsInt64(val int64) int64 {
+	if val >= 0 {
+		return val
+	}
+	return -val
+}
+
 func CompareInt(a int, b int) int {
 	switch {
 	case a < b:
@@ -116,6 +123,40 @@ func ParseInt(value string, min, max, defaultValue int) (int, error) {
 	return int(res), err
 }
 
+var (
+	cKbScale  = []string{"kb", "mb", "gb", "tb", "pb"}
+	cKScale   = []string{"k", "m", "g", "t", "p"}
+	cKibScale = []string{"kib", "mib", "gib", "tib", "pib"}
+)
+
+// Formats val as 1000 power scale ("kb", "mb", "gb", "tb", "pb"), or 1024 power
+// ("kib", "mib", "gib", "tib", "pib"), or just removes value as is
+func FormatInt64(val int64, scale int) string {
+	scl := int64(scale)
+	var sfx []string
+	if scale == 1000 {
+		sfx = cKbScale
+	} else if scale == 1024 {
+		sfx = cKibScale
+	} else {
+		return strconv.FormatInt(val, 10)
+	}
+	idx := -1
+	frac := scl / 2
+	if val < 0 {
+		frac = -frac
+	}
+	for idx < len(sfx)-1 && AbsInt64(val) > scl {
+		val = (val + frac) / scl
+		idx++
+	}
+
+	if idx >= 0 {
+		return strconv.FormatInt(val, 10) + sfx[idx]
+	}
+	return strconv.FormatInt(val, 10)
+}
+
 // ParseInt64 tries to convert value to int64, or returns default if the value is empty string.
 // The value can look like "12Kb" which means 12*1000, or "12Kib" which means 12*1024. The following
 // suffixes are supported for scaling by 1000 each: "kb", "mb", "gb", "tb", "pb", or "k", "m", "g", "t", "p".
@@ -130,11 +171,11 @@ func ParseInt64(value string, min, max, defaultValue int64) (int64, error) {
 		return defaultValue, nil
 	}
 
-	value, scale := parseSuffixVsScale(value, []string{"kb", "mb", "gb", "tb", "pb"}, 1000)
+	value, scale := parseSuffixVsScale(value, cKbScale, 1000)
 	if scale == 1 {
-		value, scale = parseSuffixVsScale(value, []string{"k", "m", "g", "t", "p"}, 1000)
+		value, scale = parseSuffixVsScale(value, cKScale, 1000)
 		if scale == 1 {
-			value, scale = parseSuffixVsScale(value, []string{"kib", "mib", "gib", "tib", "pib"}, 1024)
+			value, scale = parseSuffixVsScale(value, cKibScale, 1024)
 		}
 	}
 
