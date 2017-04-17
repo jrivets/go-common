@@ -56,6 +56,10 @@ func (lru *Lru) Get(k interface{}) (interface{}, bool) {
 }
 
 func (lru *Lru) Delete(k interface{}) interface{} {
+	return lru.DeleteWithCallback(k, true)
+}
+
+func (lru *Lru) DeleteWithCallback(k interface{}, callback bool) interface{} {
 	el, ok := lru.elements[k]
 	if !ok {
 		return nil
@@ -63,7 +67,7 @@ func (lru *Lru) Delete(k interface{}) interface{} {
 	delete(lru.elements, k)
 	e := lru.list.Remove(el).(*element)
 	lru.size -= e.size
-	if lru.callback != nil {
+	if callback && lru.callback != nil {
 		lru.callback(e.key, e.val)
 	}
 	return e.val
