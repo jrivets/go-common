@@ -73,6 +73,14 @@ func (lru *Lru) DeleteWithCallback(k interface{}, callback bool) interface{} {
 	return e.val
 }
 
+// Clear the cache. This method will not invoke callbacks for the deleted
+// elements
+func (lru *Lru) Clear() {
+	lru.list.Init()
+	lru.elements = make(map[interface{}]*list.Element)
+	lru.size = 0
+}
+
 func (lru *Lru) Len() int {
 	return len(lru.elements)
 }
