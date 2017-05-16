@@ -10,9 +10,22 @@ import (
 // CompareF is used in collections to compare elements if some ordering is needed
 // please see `SortedSlice` as an example. It compares 2 objects a and b and returns a value(val): val < 0 if a < b, val == 0 if a == b, and val > 0 if a > b
 type CompareF func(a, b interface{}) int
+type Int64 int64
 
 type Comparable interface {
 	Compare(other Comparable) int
+}
+
+func (i Int64) Compare(other Comparable) int {
+	i2 := other.(Int64)
+	switch {
+	case i < i2:
+		return -1
+	case i > i2:
+		return 1
+	default:
+		return 0
+	}
 }
 
 var ccf = func(a, b interface{}) int {

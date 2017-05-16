@@ -146,3 +146,12 @@ func (s *sortedSliceSuite) TestCopy(c *check.C) {
 	c.Check(slice[0].(*paramType).v, check.Equals, 25)
 	c.Check(ss.At(0).(*paramType).v, check.Equals, 3)
 }
+
+func (s *sortedSliceSuite) TestInt(c *check.C) {
+	ss, _ := NewSortedSlice(1)
+	ss.Add(Int64(5))
+	ss.Add(Int64(3))
+
+	c.Check(ss.At(0).(Int64), check.Equals, Int64(3))
+	c.Check(ss.At(1).(Int64), check.Equals, Int64(5))
+}
