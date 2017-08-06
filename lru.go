@@ -11,7 +11,7 @@ type (
 		elements map[interface{}]*list.Element
 		size     int64
 		maxSize  int64
-		callback Callback
+		callback LruCallback
 	}
 
 	element struct {
@@ -20,10 +20,10 @@ type (
 		size int64
 	}
 
-	Callback func(k, v interface{})
+	LruCallback func(k, v interface{})
 )
 
-func NewLRU(maxSize int64, callback Callback) *Lru {
+func NewLRU(maxSize int64, callback LruCallback) *Lru {
 	if maxSize < 1 {
 		panic("LRU size=" + strconv.FormatInt(maxSize, 10) + " should be positive.")
 	}
