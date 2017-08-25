@@ -206,7 +206,7 @@ func (lru *lru_ttl) deleteWithCallback(k interface{}, callback bool) interface{}
 		return nil
 	}
 	delete(lru.elements, k)
-	e := lru.list.Remove(el).(*element)
+	e := lru.list.Remove(el).(*element_ttl)
 	lru.size -= e.size
 	if callback && lru.callback != nil {
 		lru.callback(e.key, e.val)
