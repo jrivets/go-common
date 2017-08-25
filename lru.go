@@ -7,8 +7,13 @@ import (
 )
 
 type (
+	// Least Recently Used container interface. Defines basic methods for
+	// different implementations (see sized and time-based below).
+	//
+	// Method calls should be guarded by synchronization primitives in
+	// multi-thread environment, unless it's explicitly said "friendly"
 	LRU interface {
-		// Add an element to the LRU
+		// Add an element to the LRU.
 		Add(k, v interface{}, size int64)
 		// returns the element and marks it as recently used
 		Get(k interface{}) (interface{}, bool)
@@ -19,7 +24,9 @@ type (
 		// Garbage collection call, can be needed for time restricted LRU
 		Sweep()
 		Clear()
+		// Multithread: friendly
 		Len() int
+		// Multithread: friendly
 		Size() int64
 	}
 
