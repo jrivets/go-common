@@ -16,6 +16,8 @@ type (
 		Peek(k interface{}) (interface{}, bool)
 		Delete(k interface{}) interface{}
 		DeleteWithCallback(k interface{}, callback bool) interface{}
+		// Garbage collection call, can be needed for time restricted LRU
+		Sweep()
 		Clear()
 		Len() int
 		Size() int64
@@ -124,6 +126,9 @@ func (lru *Lru) DeleteWithCallback(k interface{}, callback bool) interface{} {
 	return e.val
 }
 
+func (lru *Lru) Sweep() {
+}
+
 // Clear the cache. This method will not invoke callbacks for the deleted
 // elements
 func (lru *Lru) Clear() {
@@ -164,7 +169,6 @@ func (lru *lru_ttl) Add(k, v interface{}, size int64) {
 }
 
 func (lru *lru_ttl) Get(k interface{}) (interface{}, bool) {
-	lru.timeCleanup()
 	if e, ok := lru.elements[k]; ok {
 		lru.list.MoveToBack(e)
 		return e.Value.(*element_ttl).val, true
@@ -173,18 +177,15 @@ func (lru *lru_ttl) Get(k interface{}) (interface{}, bool) {
 }
 
 func (lru *lru_ttl) Peek(k interface{}) (interface{}, bool) {
-	lru.timeCleanup()
 	e, ok := lru.elements[k]
 	return e, ok
 }
 
 func (lru *lru_ttl) Delete(k interface{}) interface{} {
-	lru.timeCleanup()
 	return lru.deleteWithCallback(k, true)
 }
 
 func (lru *lru_ttl) DeleteWithCallback(k interface{}, callback bool) interface{} {
-	lru.timeCleanup()
 	return lru.deleteWithCallback(k, callback)
 }
 
@@ -204,6 +205,10 @@ func (lru *lru_ttl) deleteWithCallback(k interface{}, callback bool) interface{}
 		lru.callback(e.key, e.val)
 	}
 	return e.val
+}
+
+func (lru *lru_ttl) Sweep() {
+	lru.timeCleanup()
 }
 
 // Clear the cache. This method will not invoke callbacks for the deleted
