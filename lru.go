@@ -19,8 +19,15 @@ type (
 		Get(k interface{}) (interface{}, bool)
 		// returns the element, but not marking it as used recently
 		Peek(k interface{}) (interface{}, bool)
+
+		// Deletes an element and call for callback if it is not nil
+		// equivavalent to DeleteWithCallback(k, true)
 		Delete(k interface{}) interface{}
+
+		// Deletes an elementa and call callback function if callback==true and
+		// the callback function was specified for the container
 		DeleteWithCallback(k interface{}, callback bool) interface{}
+
 		// Garbage collection call, can be needed for time restricted LRU
 		Sweep()
 		Clear()
@@ -177,8 +184,10 @@ func (lru *lru_ttl) Add(k, v interface{}, size int64) {
 
 func (lru *lru_ttl) Get(k interface{}) (interface{}, bool) {
 	if e, ok := lru.elements[k]; ok {
+		et := e.Value.(*element_ttl)
+		et.expiredOn = time.Now().Add(lru.duration)
 		lru.list.MoveToBack(e)
-		return e.Value.(*element_ttl).val, true
+		return et.val, true
 	}
 	return nil, false
 }
