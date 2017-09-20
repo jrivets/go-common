@@ -118,8 +118,10 @@ func (lru *Lru) Get(k interface{}) (interface{}, bool) {
 }
 
 func (lru *Lru) Peek(k interface{}) (interface{}, bool) {
-	e, ok := lru.elements[k]
-	return e, ok
+	if e, ok := lru.elements[k]; ok {
+		return e.Value.(*element).val, true
+	}
+	return nil, false
 }
 
 func (lru *Lru) Delete(k interface{}) interface{} {
@@ -193,8 +195,11 @@ func (lru *lru_ttl) Get(k interface{}) (interface{}, bool) {
 }
 
 func (lru *lru_ttl) Peek(k interface{}) (interface{}, bool) {
-	e, ok := lru.elements[k]
-	return e, ok
+	if e, ok := lru.elements[k]; ok {
+		et := e.Value.(*element_ttl)
+		return et.val, true
+	}
+	return nil, false
 }
 
 func (lru *lru_ttl) Delete(k interface{}) interface{} {
