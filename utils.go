@@ -194,12 +194,12 @@ func ParseInt64(value string, min, max, defaultValue int64) (int64, error) {
 
 	intValue, err := strconv.Atoi(value)
 	if err != nil {
-		return 0, err
+		return defaultValue, err
 	}
 	val := int64(intValue) * scale
 
 	if min > val || max < val {
-		return 0, errors.New("Value should be in the range [" + strconv.FormatInt(min, 10) + ".." + strconv.FormatInt(max, 10) + "]")
+		return defaultValue, errors.New("Value should be in the range [" + strconv.FormatInt(min, 10) + ".." + strconv.FormatInt(max, 10) + "]")
 	}
 
 	return val, nil

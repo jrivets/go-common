@@ -17,11 +17,11 @@ import (
 // appear in different (vendored) packages of different the project libraries.
 // To introduce a run-time check of incorrectness of the project, the Global Map
 // can be used.
-
+//
 // The implementation is based on creating a temporary file which will be
 // deleted every time when the map becomes empty. Also the GMapCleanup() allows
 // to clean the storage and remove the temporary file unconditionally.
-
+//
 // Global Map uses the temporary file to control its own copies and panics if
 // the expected file already exists (what indicates that another copy of Global
 // Map already created it).
@@ -33,6 +33,8 @@ var gmap struct {
 	file *os.File
 	lock sync.Mutex
 }
+
+
 
 // Returns a value by key. It returns whether the key-value pair is in the
 // storage in the second bool parameter
@@ -117,7 +119,7 @@ func checkGMap(create bool) bool {
 
 func createGMapFile() {
 	dir := os.TempDir()
-	fileName := fmt.Sprintf("gorivets.globalMap.%d", os.Getpid())
+	fileName := fmt.Sprintf("gorivets.globalMap.%d-%p", os.Getpid(), &gmap)
 	name := filepath.Join(dir, fileName)
 	var err error
 	gmap.file, err = os.OpenFile(name, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0600)
